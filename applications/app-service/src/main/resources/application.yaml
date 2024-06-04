@@ -22,3 +22,9 @@ management:
         enabled: true
 cors:
   allowed-origins: "http://localhost:4200,http://localhost:8080"
+broadcast:
+  namespace: "headless-service"
+  url: "https://%s:8080/actuator/health"
+  cert-chain: "/etc/istio-certs/cert-chain.pem"
+  key: "/etc/istio-certs/key.pem"
+  timeout: 5000
