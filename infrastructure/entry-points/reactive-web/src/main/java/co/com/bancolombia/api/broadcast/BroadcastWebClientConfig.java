@@ -2,6 +2,7 @@ package co.com.bancolombia.api.broadcast;
 
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
 import lombok.SneakyThrows;
@@ -18,8 +19,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 
 import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.InputStream;
@@ -29,6 +28,7 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.util.function.Supplier;
 
 import static io.netty.channel.ChannelOption.CONNECT_TIMEOUT_MILLIS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -36,21 +36,14 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 @Configuration
 public class BroadcastWebClientConfig {
 
-    private final String certChainPath;
-    private final String keyPath;
-    private final int timeout;
-
-    public BroadcastWebClientConfig(
-            @Value("${broadcast.cert-chain}") String certChainPath,
-            @Value("${broadcast.key}") String keyPath,
+    @Bean
+    public Supplier<WebClient> webClientFunction(
+            @Value("${broadcast.cert-chain}") String certChainPath, @Value("${broadcast.key}") String keyPath,
             @Value("${broadcast.timeout}") int timeout) {
-        this.certChainPath = certChainPath;
-        this.keyPath = keyPath;
-        this.timeout = timeout;
+        return () -> broadcastWebClient(certChainPath, keyPath, timeout);
     }
 
-    @Bean
-    public WebClient broadcastWebClient(WebClient.Builder builder) {
+    public static WebClient broadcastWebClient(String certChainPath, String keyPath, int timeout) {
         SslContext sslContext = getSslContext(certChainPath, keyPath);
 
         ReactorClientHttpConnector connector = new ReactorClientHttpConnector(HttpClient.create()
@@ -62,7 +55,7 @@ public class BroadcastWebClientConfig {
                     connection.addHandlerLast(new WriteTimeoutHandler(timeout, MILLISECONDS));
                 }));
 
-        return builder
+        return WebClient.builder()
                 .clientConnector(connector)
                 .build();
     }
@@ -79,15 +72,9 @@ public class BroadcastWebClientConfig {
         KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
         kmf.init(keyStore, new char[0]);
 
-        TrustManager trustAllCerts = new X509TrustManager() {
-            public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[]{}; }
-            public void checkClientTrusted(X509Certificate[] certs, String authType) {}
-            public void checkServerTrusted(X509Certificate[] certs, String authType) {}
-        };
-
         return SslContextBuilder.forClient()
                 .keyManager(kmf)
-                .trustManager(trustAllCerts)
+                .trustManager(InsecureTrustManagerFactory.INSTANCE)
                 .build();
     }
 

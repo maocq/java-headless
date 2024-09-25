@@ -9,38 +9,41 @@ import reactor.core.publisher.Mono;
 
 import java.net.InetAddress;
 import java.util.List;
+import java.util.function.Supplier;
 
 @Service
 public class BroadcastService {
 
-    private final WebClient broadcastWebClient;
+    private final Supplier<WebClient> webClientFunction;
     private final String namespace;
     private final String url;
 
     public BroadcastService(
-            WebClient broadcastWebClient,
+            Supplier<WebClient> webClientFunction,
             @Value("${broadcast.namespace}") String namespace,
             @Value("${broadcast.url}") String url) {
-        this.broadcastWebClient = broadcastWebClient;
+        this.webClientFunction = webClientFunction;
         this.namespace = namespace;
         this.url = url;
     }
 
     public Mono<List<String>> broadcast() {
         var myIp = getMyHostAddress();
-        var addresses = getAddresses();
 
-        return Flux.just(addresses)
+        return Mono.fromSupplier(webClientFunction)
+                .flatMapMany(webClient -> Flux.just(getAddresses())
                 .flatMap(address -> {
                     var podUrl = String.format(url, address.getHostAddress());
                     String okurl =  myIp.equals(address.getHostAddress())
                             ? podUrl.replace("https", "http") : podUrl;
-                    return executeRequest(okurl);
-                }).collectList();
+                    return executeRequest(webClient, okurl);
+                })).collectList();
     }
 
-    private Mono<String> executeRequest(String url) {
-        return broadcastWebClient.get().uri(url)
+    private Mono<String> executeRequest(WebClient webClient, String url) {
+        return webClient
+                .get()
+                .uri(url)
                 .retrieve()
                 .bodyToMono(String.class)
                 .map(response -> url + ": " + response)
