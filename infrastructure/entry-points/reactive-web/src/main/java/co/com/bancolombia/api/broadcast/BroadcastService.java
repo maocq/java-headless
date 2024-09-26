@@ -9,20 +9,19 @@ import reactor.core.publisher.Mono;
 
 import java.net.InetAddress;
 import java.util.List;
-import java.util.function.Supplier;
 
 @Service
 public class BroadcastService {
 
-    private final Supplier<WebClient> webClientFunction;
+    private final BroadcastWebClientConfig webClientConfig;
     private final String namespace;
     private final String url;
 
     public BroadcastService(
-            Supplier<WebClient> webClientFunction,
+            BroadcastWebClientConfig webClientConfig,
             @Value("${broadcast.namespace}") String namespace,
             @Value("${broadcast.url}") String url) {
-        this.webClientFunction = webClientFunction;
+        this.webClientConfig = webClientConfig;
         this.namespace = namespace;
         this.url = url;
     }
@@ -30,7 +29,7 @@ public class BroadcastService {
     public Mono<List<String>> broadcast() {
         var myIp = getMyHostAddress();
 
-        return Mono.fromSupplier(webClientFunction)
+        return Mono.fromSupplier(webClientConfig::broadcastWebClient)
                 .flatMapMany(webClient -> Flux.just(getAddresses())
                 .flatMap(address -> {
                     var podUrl = String.format(url, address.getHostAddress());

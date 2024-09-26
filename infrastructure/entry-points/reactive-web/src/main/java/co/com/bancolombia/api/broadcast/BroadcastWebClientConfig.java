@@ -12,9 +12,8 @@ import org.bouncycastle.asn1.pkcs.RSAPrivateKey;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.util.io.pem.PemReader;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 
@@ -28,22 +27,26 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.spec.PKCS8EncodedKeySpec;
-import java.util.function.Supplier;
 
 import static io.netty.channel.ChannelOption.CONNECT_TIMEOUT_MILLIS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
-@Configuration
+@Component
 public class BroadcastWebClientConfig {
 
-    @Bean
-    public Supplier<WebClient> webClientFunction(
+    private final String certChainPath;
+    private final String keyPath;
+    private final int timeout;
+
+    public BroadcastWebClientConfig(
             @Value("${broadcast.cert-chain}") String certChainPath, @Value("${broadcast.key}") String keyPath,
             @Value("${broadcast.timeout}") int timeout) {
-        return () -> broadcastWebClient(certChainPath, keyPath, timeout);
+        this.certChainPath = certChainPath;
+        this.keyPath = keyPath;
+        this.timeout = timeout;
     }
 
-    public static WebClient broadcastWebClient(String certChainPath, String keyPath, int timeout) {
+    public WebClient broadcastWebClient() {
         SslContext sslContext = getSslContext(certChainPath, keyPath);
 
         ReactorClientHttpConnector connector = new ReactorClientHttpConnector(HttpClient.create()
